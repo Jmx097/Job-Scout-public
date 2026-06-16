@@ -86,6 +86,15 @@ def derive_careers_url(company_url, job_url, company):
 # ── Session store ────────────────────────────────────────────────────────────
 
 search_sessions = {}
+SESSION_TTL_SECONDS = 1800  # drop sessions older than 30 minutes
+
+def _cleanup_sessions():
+    """Remove sessions that completed or errored more than SESSION_TTL_SECONDS ago."""
+    cutoff = time.time() - SESSION_TTL_SECONDS
+    stale = [sid for sid, s in search_sessions.items()
+             if s.get("status") in ("done", "error") and s.get("finished_at", 0) < cutoff]
+    for sid in stale:
+        del search_sessions[sid]
 
 # ── Flask app ────────────────────────────────────────────────────────────────
 
@@ -93,7 +102,7 @@ UPLOAD_FOLDER = Path(__file__).parent / "uploads"
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 
 app = Flask(__name__, static_folder="static")
-CORS(app)
+CORS(app, origins=["http://localhost:5000", "http://127.0.0.1:5000"])
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 @app.route("/")
@@ -231,19 +240,23 @@ def _run_search(session_id, params):
                 "description": description,
             })
 
-        sess["results"] = results
-        sess["status"]  = "done"
+        sess["results"]     = results
+        sess["status"]      = "done"
+        sess["finished_at"] = time.time()
         emit("done", {"count": len(results)})
 
     except ImportError:
-        sess["status"] = "error"
+        sess["status"]      = "error"
+        sess["finished_at"] = time.time()
         emit("error", {"message": "jobspy not installed. Run: pip install python-jobspy"})
     except Exception as e:
-        sess["status"] = "error"
+        sess["status"]      = "error"
+        sess["finished_at"] = time.time()
         emit("error", {"message": str(e)})
 
 @app.route("/api/search", methods=["POST"])
 def start_search():
+    _cleanup_sessions()
     params = request.get_json(force=True)
     if not params.get("search_term"):
         return jsonify({"error": "search_term is required"}), 400
@@ -281,7 +294,7 @@ def stream_search(session_id):
         headers={
             "Cache-Control":               "no-cache",
             "X-Accel-Buffering":           "no",
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": "http://localhost:5000",
         },
     )
 
@@ -299,4 +312,4 @@ def get_results(session_id):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n  Plinko Pocket: Job Scout running at http://localhost:{port}\n")
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    app.run(host="127.0.0.1", port=port, debug=False, threaded=True)
