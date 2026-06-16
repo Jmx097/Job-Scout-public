@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.spec
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Job data (personal)
+jobs_raw.csv
+jobs_filtered.csv
+jobs_shortlist.csv
+job_leads_*.md
+shortlist.md
+
+# Uploads (CV files)
+job-scout/uploads/*
+!job-scout/uploads/.gitkeep
+
+# PyInstaller artifacts
+job-scout/build/
+job-scout/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Resumes
+*.pdf
+*.docx
+
+# External projects (separate repos)
+BMAD-METHOD/

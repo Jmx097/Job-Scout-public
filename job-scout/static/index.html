@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Plinko Pocket: Job Scout</title>
+<style>
+/* ── Reset ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green:      #3e9c63;
+  --green-dark: #2d7a4a;
+  --green-light:#e8f5ee;
+  --text:       #111827;
+  --muted:      #6b7280;
+  --border:     #e5e7eb;
+  --bg:         #f9fafb;
+  --white:      #ffffff;
+  --danger:     #dc2626;
+  --sidebar-w:  320px;
+  --radius:     8px;
+  font-size: 14px;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+a { color: var(--green); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { cursor: pointer; font-family: inherit; font-size: 13px; border: none; }
+input, select, textarea { font-family: inherit; font-size: 13px; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+/* ── Shell ───────────────────────────────────────────────── */
+.shell { display: flex; height: 100vh; overflow: hidden; }
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* ── Brand bar ───────────────────────────────────────────── */
+.brand {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.brand-name span { color: var(--green); }
+.brand-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Tabs ────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  gap: 4px;
+}
+.tab {
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  background: none;
+  border-radius: 0;
+  transition: color .15s, border-color .15s;
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+.tab.active { color: var(--green); border-bottom-color: var(--green); }
+.tab:hover:not(.active) { color: var(--text); }
+
+/* ── Panels ──────────────────────────────────────────────── */
+.panel { display: none; flex-direction: column; padding: 18px 20px; gap: 14px; }
+.panel.active { display: flex; }
+
+/* ── Form elements ───────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+.input {
+  background: var(--white);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  outline: none;
+  width: 100%;
+  transition: border-color .15s;
+}
+.input:focus { border-color: var(--green); }
+.input::placeholder { color: #9ca3af; }
+select.input option { background: var(--white); }
+
+textarea.input { resize: vertical; }
+
+/* check grid */
+.check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color .12s;
+  font-size: 12px;
+  color: var(--text);
+}
+.check-item:has(input:checked) {
+  border-color: var(--green);
+  background: var(--green-light);
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.check-item input { accent-color: var(--green); flex-shrink: 0; }
+.check-item label { cursor: pointer; }
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.toggle-row input { accent-color: var(--green); }
+.toggle-row label { cursor: pointer; font-size: 13px; }
+
+/* ── CV upload ───────────────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  background: var(--bg);
+}
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: var(--green);
+  background: var(--green-light);
+}
+.drop-title { font-weight: 600; font-size: 13px; color: var(--text); }
+.drop-sub   { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.parsed-box {
+  background: var(--green-light);
+  border: 1px solid #a7d7bb;
+  border-radius: var(--radius);
+  padding: 12px;
+  display: none;
+}
+.parsed-box.visible { display: block; }
+.parsed-filename { font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid #a7d7bb;
+  color: var(--green-dark);
+  background: var(--white);
+}
+
+/* ── Divider / section header ────────────────────────────── */
+.divider { height: 1px; background: var(--border); }
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+
+/* ── Primary button ──────────────────────────────────────── */
+.btn-primary {
+  background: var(--green);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  width: 100%;
+  transition: background .15s;
+  letter-spacing: 0.1px;
+}
+.btn-primary:hover { background: var(--green-dark); }
+.btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+
+.btn-outline {
+  background: var(--white);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  transition: all .15s;
+  font-size: 12px;
+}
+.btn-outline:hover { border-color: var(--green); color: var(--green); }
+
+/* ── Main content ────────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+
+.topbar {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.topbar-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.topbar-meta  { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+/* ── Progress ────────────────────────────────────────────── */
+.progress-wrap { display: none; padding: 12px 24px 0; }
+.progress-wrap.visible { display: block; }
+.progress-msg { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.progress-track { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--green); border-radius: 99px; transition: width .4s; width: 0%; }
+
+/* ── Toolbar / filters ───────────────────────────────────── */
+.toolbar {
+  display: none;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--white);
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.toolbar.visible { display: flex; }
+
+.pill {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--white);
+  cursor: pointer;
+  transition: all .12s;
+}
+.pill.active { border-color: var(--green); color: var(--green); background: var(--green-light); font-weight: 600; }
+.pill:hover:not(.active) { border-color: var(--text); color: var(--text); }
+
+.toolbar-count { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.sort-select {
+  background: var(--white);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  outline: none;
+  font-size: 12px;
+}
+
+/* ── Results ─────────────────────────────────────────────── */
+.results { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 55vh;
+  text-align: center;
+}
+.empty-icon  { width: 40px; height: 40px; background: var(--green-light); border-radius: 50%; display: grid; place-items: center; margin: 0 auto; }
+.empty-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.empty-sub   { font-size: 13px; color: var(--muted); max-width: 280px; }
+
+.jobs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+/* ── Job card ────────────────────────────────────────────── */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.card:hover { border-color: var(--green); box-shadow: 0 2px 12px rgba(62,156,99,.08); }
+
+.card-top { display: flex; gap: 12px; align-items: flex-start; }
+
+.company-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.company-logo img { width: 100%; height: 100%; object-fit: cover; }
+
+.card-info { flex: 1; min-width: 0; }
+.card-title {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-company { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.card-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+.meta-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--bg);
+}
+.meta-tag.remote { border-color: #a7d7bb; color: var(--green-dark); background: var(--green-light); }
+.meta-tag.source { border-color: #bfdbfe; color: #1d4ed8; background: #eff6ff; }
+
+.card-salary { font-size: 12px; font-weight: 600; color: var(--green-dark); }
+
+.card-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-actions { display: flex; gap: 8px; margin-top: auto; }
+
+.btn-careers {
+  flex: 1;
+  background: var(--green);
+  color: var(--white);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  text-align: center;
+  transition: background .15s;
+  display: inline-block;
+}
+.btn-careers:hover { background: var(--green-dark); text-decoration: none; color: var(--white); }
+
+.btn-listing {
+  background: var(--white);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  text-align: center;
+  transition: all .15s;
+  display: inline-block;
+  white-space: nowrap;
+}
+.btn-listing:hover { border-color: var(--text); color: var(--text); text-decoration: none; }
+
+/* ── Toast ───────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 20px; right: 20px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 13px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.1);
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all .25s;
+  z-index: 999;
+  max-width: 300px;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.ok  { border-left: 3px solid var(--green); }
+.toast.err { border-left: 3px solid var(--danger); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
+  <aside class="sidebar">
+
+    <div class="brand">
+      <div class="brand-name">Plinko Pocket: <span>Job Scout</span></div>
+      <div class="brand-sub">Powered by JobSpy &middot; Open Source</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('search')">Search</button>
+      <button class="tab" onclick="switchTab('filters')">Filters</button>
+      <button class="tab" onclick="switchTab('sources')">Sources</button>
+    </div>
+
+    <!-- ── Search panel ── -->
+    <div class="panel active" id="panel-search">
+
+      <!-- CV Upload -->
+      <div class="field">
+        <span class="label">Your CV (optional)</span>
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-title">Drop CV here or click to upload</div>
+          <div class="drop-sub">PDF or DOCX &mdash; auto-fills search fields</div>
+          <input type="file" id="cvFile" accept=".pdf,.docx,.doc,.txt" style="display:none" />
+        </div>
+        <div class="parsed-box" id="parsedBox">
+          <div class="parsed-filename" id="parsedName"></div>
+          <div class="label" style="margin-bottom:4px">Detected roles</div>
+          <div class="tag-list" id="roleTagList"></div>
+          <div class="label" style="margin-top:8px;margin-bottom:4px">Detected skills</div>
+          <div class="tag-list" id="skillTagList"></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Core search -->
+      <div class="field">
+        <label class="label" for="searchTerm">Job title / keywords</label>
+        <input class="input" id="searchTerm" type="text" placeholder="e.g. Solutions Engineer" />
+      </div>
+
+      <div class="field">
+        <label class="label" for="location">Location</label>
+        <input class="input" id="location" type="text" placeholder="e.g. Toronto, Canada" />
+      </div>
+
+      <div class="toggle-row">
+        <input type="checkbox" id="isRemote" />
+        <label for="isRemote">Remote only</label>
+      </div>
+
+      <button class="btn-primary" id="searchBtn" onclick="startSearch()">Find Jobs</button>
+
+    </div>
+
+    <!-- ── Filters panel ── -->
+    <div class="panel" id="panel-filters">
+
+      <div class="field">
+        <label class="label" for="jobType">Job type</label>
+        <select class="input" id="jobType">
+          <option value="">Any</option>
+          <option value="fulltime">Full-time</option>
+          <option value="parttime">Part-time</option>
+          <option value="contract">Contract</option>
+          <option value="internship">Internship</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="hoursOld">Posted within</label>
+        <select class="input" id="hoursOld">
+          <option value="24">Last 24 hours</option>
+          <option value="48">Last 48 hours</option>
+          <option value="72" selected>Last 3 days</option>
+          <option value="168">Last 7 days</option>
+          <option value="336">Last 14 days</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="resultsPerSite">Results per source</label>
+        <select class="input" id="resultsPerSite">
+          <option value="10">10</option>
+          <option value="15" selected>15</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="countryIndeed">Country (Indeed / Glassdoor)</label>
+        <select class="input" id="countryIndeed">
+          <option value="USA">United States</option>
+          <option value="Canada" selected>Canada</option>
+          <option value="UK">United Kingdom</option>
+          <option value="Australia">Australia</option>
+          <option value="Germany">Germany</option>
+          <option value="Netherlands">Netherlands</option>
+          <option value="Singapore">Singapore</option>
+          <option value="India">India</option>
+          <option value="France">France</option>
+          <option value="Ireland">Ireland</option>
+        </select>
+      </div>
+
+      <div class="divider"></div>
+      <span class="section-label">Seniority</span>
+      <p class="hint">Check the levels you want to see. Uncheck to exclude.</p>
+      <div class="check-grid">
+        <div class="check-item">
+          <input type="checkbox" id="lvl-entry" checked />
+          <label for="lvl-entry">Entry level</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="lvl-mid" checked />
+          <label for="lvl-mid">Mid level</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="lvl-senior" />
+          <label for="lvl-senior">Senior</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="lvl-lead" />
+          <label for="lvl-lead">Lead / Staff</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="lvl-manager" />
+          <label for="lvl-manager">Manager</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="lvl-director" />
+          <label for="lvl-director">Director+</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="excludeKw">Exclude title keywords</label>
+        <input class="input" id="excludeKw" type="text" placeholder="Senior, Lead, Director, VP" />
+        <span class="hint">Comma-separated. Hides roles with these words in the title.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="googleTerm">Google-specific query</label>
+        <input class="input" id="googleTerm" type="text" placeholder="Leave blank to auto-generate" />
+        <span class="hint">Google Jobs uses its own search syntax. Leave blank to use your title + location.</span>
+      </div>
+
+      <button class="btn-primary" onclick="startSearch()">Find Jobs</button>
+
+    </div>
+
+    <!-- ── Sources panel ── -->
+    <div class="panel" id="panel-sources">
+
+      <p class="hint">Select which job boards to search. More sources = more results but slower.</p>
+
+      <div class="check-grid">
+        <div class="check-item">
+          <input type="checkbox" id="src-indeed" checked />
+          <label for="src-indeed">Indeed</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="src-linkedin" checked />
+          <label for="src-linkedin">LinkedIn</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="src-zip" checked />
+          <label for="src-zip">ZipRecruiter</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="src-google" checked />
+          <label for="src-google">Google Jobs</label>
+        </div>
+        <div class="check-item">
+          <input type="checkbox" id="src-glassdoor" />
+          <label for="src-glassdoor">Glassdoor</label>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <span class="section-label">Proxy settings</span>
+      <p class="hint">LinkedIn rate-limits without proxies. Add one per line.</p>
+      <div class="field">
+        <textarea class="input" id="proxies" rows="4" placeholder="user:pass@host:port&#10;localhost"></textarea>
+      </div>
+
+      <div class="divider"></div>
+      <span class="section-label">Display</span>
+      <div class="toggle-row">
+        <input type="checkbox" id="showDesc" checked />
+        <label for="showDesc">Show job descriptions</label>
+      </div>
+
+      <div class="divider"></div>
+      <p class="hint">
+        Plinko Pocket: Job Scout is open source and runs entirely on your machine.
+        No accounts. No API keys. No data leaves your computer.<br><br>
+        Built with <a href="https://github.com/speedyapply/JobSpy" target="_blank">JobSpy</a>
+        and the <a href="https://github.com/bmad-code-org/BMAD-METHOD" target="_blank">BMAD method</a>.
+      </p>
+
+      <button class="btn-primary" onclick="startSearch()">Find Jobs</button>
+
+    </div>
+
+  </aside>
+
+  <!-- ══ MAIN ═════════════════════════════════════════════════ -->
+  <main class="main">
+
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="topTitle">Ready to search</div>
+        <div class="topbar-meta" id="topMeta">Configure your criteria and click Find Jobs</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-outline" id="exportBtn" onclick="exportCSV()" style="display:none">Export CSV</button>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-msg" id="progressMsg">Searching...</div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="toolbar" id="toolbar">
+      <button class="pill active" onclick="filterBy('all',this)">All</button>
+      <button class="pill" onclick="filterBy('remote',this)">Remote</button>
+      <button class="pill" onclick="filterBy('fulltime',this)">Full-time</button>
+      <button class="pill" onclick="filterBy('salary',this)">Has salary</button>
+      <select class="sort-select" id="sortSelect" onchange="sortResults()">
+        <option value="date">Newest first</option>
+        <option value="company">Company A-Z</option>
+        <option value="title">Title A-Z</option>
+        <option value="salary">Salary</option>
+      </select>
+      <span class="toolbar-count" id="toolbarCount"></span>
+    </div>
+
+    <div class="results" id="results">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3e9c63" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div class="empty-title">No results yet</div>
+        <div class="empty-sub">Upload your CV, set your criteria, and click Find Jobs to get started.</div>
+      </div>
+      <div class="jobs-grid" id="jobsGrid" style="display:none"></div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let allJobs = [];
+
+// ── Seniority keyword maps ─────────────────────────────────────────────────
+const SENIORITY = {
+  'lvl-entry':   ['junior', 'entry', 'associate', 'graduate', 'new grad', 'i ', ' i,'],
+  'lvl-mid':     ['mid', 'intermediate', 'ii ', ' ii,', 'level 2'],
+  'lvl-senior':  ['senior', 'sr.', 'sr ', 'level 3'],
+  'lvl-lead':    ['lead', 'staff', 'principal', 'level 4'],
+  'lvl-manager': ['manager', 'mgr'],
+  'lvl-director':['director', 'vp', 'vice president', 'head of', 'chief', 'cto', 'ceo', 'coo', 'cpo'],
+};
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  ['search','filters','sources'].forEach((n,i) => {
+    document.querySelectorAll('.tab')[i].classList.toggle('active', n === name);
+    document.getElementById(`panel-${n}`).classList.toggle('active', n === name);
+  });
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ── CV Upload ──────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const cvFile   = document.getElementById('cvFile');
+
+dropZone.addEventListener('click', () => cvFile.click());
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleCV(e.dataTransfer.files[0]);
+});
+cvFile.addEventListener('change', () => { if (cvFile.files[0]) handleCV(cvFile.files[0]); });
+
+async function handleCV(file) {
+  dropZone.querySelector('.drop-title').textContent = 'Parsing...';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res  = await fetch('/api/upload-cv', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'err'); return; }
+
+    document.getElementById('parsedName').textContent = file.name;
+    document.getElementById('roleTagList').innerHTML  =
+      (data.keywords.roles  || []).map(r => `<span class="tag">${r}</span>`).join('');
+    document.getElementById('skillTagList').innerHTML =
+      (data.keywords.skills || []).slice(0,12).map(s => `<span class="tag">${s}</span>`).join('');
+    document.getElementById('parsedBox').classList.add('visible');
+
+    if (data.keywords.suggested_search_term)
+      document.getElementById('searchTerm').value = data.keywords.suggested_search_term;
+
+    toast(`CV parsed — ${(data.keywords.skills||[]).length} skills found`, 'ok');
+  } catch {
+    toast('Upload failed. Is the server running?', 'err');
+  }
+  dropZone.querySelector('.drop-title').textContent = 'Drop CV here or click to upload';
+}
+
+// ── Build exclusion list from seniority + manual field ────────────────────
+function getExcludeWords() {
+  const exclude = [];
+
+  // From seniority checkboxes — collect words for UNCHECKED levels
+  Object.entries(SENIORITY).forEach(([id, words]) => {
+    if (!document.getElementById(id).checked) {
+      exclude.push(...words);
+    }
+  });
+
+  // From manual exclusion field
+  const manual = document.getElementById('excludeKw').value;
+  if (manual.trim()) {
+    manual.split(',').map(w => w.trim().toLowerCase()).filter(Boolean).forEach(w => exclude.push(w));
+  }
+
+  return [...new Set(exclude)];
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────
+async function startSearch() {
+  const term = document.getElementById('searchTerm').value.trim();
+  if (!term) { toast('Enter a job title or keyword first', 'err'); return; }
+
+  const sites = [];
+  if (document.getElementById('src-indeed').checked)    sites.push('indeed');
+  if (document.getElementById('src-linkedin').checked)  sites.push('linkedin');
+  if (document.getElementById('src-zip').checked)       sites.push('zip_recruiter');
+  if (document.getElementById('src-google').checked)    sites.push('google');
+  if (document.getElementById('src-glassdoor').checked) sites.push('glassdoor');
+  if (!sites.length) { toast('Select at least one job source', 'err'); return; }
+
+  const googleTerm = document.getElementById('googleTerm').value.trim()
+    || `${term} jobs ${document.getElementById('location').value.trim()}`;
+
+  const params = {
+    search_term:       term,
+    location:          document.getElementById('location').value.trim(),
+    is_remote:         document.getElementById('isRemote').checked,
+    job_type:          document.getElementById('jobType').value || null,
+    hours_old:         parseInt(document.getElementById('hoursOld').value),
+    results_per_site:  parseInt(document.getElementById('resultsPerSite').value),
+    country_indeed:    document.getElementById('countryIndeed').value,
+    google_search_term: googleTerm,
+    sites,
+  };
+
+  // Reset UI
+  document.getElementById('searchBtn').disabled = true;
+  document.getElementById('searchBtn').textContent = 'Searching...';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('jobsGrid').style.display   = 'none';
+  document.getElementById('toolbar').classList.remove('visible');
+  document.getElementById('exportBtn').style.display  = 'none';
+  document.getElementById('progressWrap').classList.add('visible');
+  setProgress('Connecting to job boards...', 5);
+  allJobs = [];
+
+  try {
+    const res  = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'err'); resetBtn(); return; }
+    listenAndFetch(data.session_id, params);
+  } catch {
+    toast('Connection failed. Is the server running on port 5000?', 'err');
+    resetBtn();
+  }
+}
+
+function listenAndFetch(sid, params) {
+  const es = new EventSource(`/api/search/${sid}/stream`);
+  es.onmessage = e => {
+    const ev = JSON.parse(e.data);
+    if (ev.type === 'progress') setProgress(ev.data.message, ev.data.pct || 50);
+    if (ev.type === 'done')  { es.close(); fetchResults(sid, params); }
+    if (ev.type === 'error') { es.close(); toast('Error: ' + ev.data.message, 'err'); resetBtn(); hideProgress(); }
+  };
+  es.onerror = () => { es.close(); setTimeout(() => fetchResults(sid, params), 2000); };
+}
+
+async function fetchResults(sid, params) {
+  setProgress('Processing results...', 95);
+  try {
+    const res  = await fetch(`/api/search/${sid}/results`);
+    const data = await res.json();
+
+    // Apply seniority + exclusion filtering client-side
+    const excludeWords = getExcludeWords();
+    allJobs = (data.results || []).filter(job => {
+      if (!excludeWords.length) return true;
+      const title = (job.title || '').toLowerCase();
+      return !excludeWords.some(w => title.includes(w));
+    });
+
+    renderJobs(allJobs);
+    document.getElementById('topTitle').textContent = `${allJobs.length} opportunities`;
+    document.getElementById('topMeta').textContent  =
+      `"${params.search_term}" · ${params.location || 'Anywhere'} · ${params.sites.join(', ')}`;
+    document.getElementById('toolbar').classList.add('visible');
+    document.getElementById('exportBtn').style.display = '';
+    document.getElementById('toolbarCount').textContent = `${allJobs.length} results`;
+    toast(`Found ${allJobs.length} jobs`, 'ok');
+  } catch {
+    toast('Failed to load results', 'err');
+  }
+  resetBtn();
+  hideProgress();
+}
+
+// ── Render cards ───────────────────────────────────────────────────────────
+function renderJobs(jobs) {
+  const grid  = document.getElementById('jobsGrid');
+  const empty = document.getElementById('emptyState');
+  const showDesc = document.getElementById('showDesc').checked;
+
+  if (!jobs.length) {
+    grid.style.display  = 'none';
+    empty.style.display = '';
+    empty.querySelector('.empty-title').textContent = 'No matching results';
+    empty.querySelector('.empty-sub').textContent   =
+      'Try adjusting seniority filters, exclusion keywords, or broadening your search.';
+    return;
+  }
+
+  grid.style.display  = '';
+  empty.style.display = 'none';
+
+  grid.innerHTML = jobs.map(j => {
+    const init = (j.company || '?').split(/\s+/).map(w => w[0] || '').join('').slice(0,2).toUpperCase();
+    const logo = j.logo
+      ? `<img src="${x(j.logo)}" alt="${x(j.company)}" onerror="this.parentElement.textContent='${x(init)}'">`
+      : init;
+
+    const remote  = j.is_remote  ? `<span class="meta-tag remote">Remote</span>` : '';
+    const jtype   = j.job_type   ? `<span class="meta-tag">${x(j.job_type)}</span>` : '';
+    const loc     = j.location   ? `<span class="meta-tag">${x(j.location)}</span>` : '';
+    const posted  = j.date_posted? `<span class="meta-tag">${x(j.date_posted)}</span>` : '';
+    const source  = `<span class="meta-tag source">${x(j.site)}</span>`;
+    const salary  = j.salary     ? `<div class="card-salary">${x(j.salary)}</div>` : '';
+    const desc    = showDesc && j.description ? `<div class="card-desc">${x(j.description)}</div>` : '';
+    const listing = j.job_url    ? `<a href="${x(j.job_url)}" target="_blank" rel="noopener" class="btn-listing">View listing</a>` : '';
+
+    return `
+    <div class="card" data-remote="${j.is_remote}" data-type="${x(j.job_type)}" data-salary="${j.salary?1:0}">
+      <div class="card-top">
+        <div class="company-logo">${logo}</div>
+        <div class="card-info">
+          <div class="card-title">${x(j.title)}</div>
+          <div class="card-company">${x(j.company)}${j.industry ? ' &middot; ' + x(j.industry) : ''}</div>
+        </div>
+      </div>
+      <div class="card-meta">${remote}${jtype}${loc}${posted}${source}</div>
+      ${salary}
+      ${desc}
+      <div class="card-actions">
+        <a href="${x(j.careers_url)}" target="_blank" rel="noopener" class="btn-careers">Company careers page</a>
+        ${listing}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function x(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Filter + sort ──────────────────────────────────────────────────────────
+function filterBy(f, btn) {
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  let jobs = allJobs;
+  if (f === 'remote')   jobs = allJobs.filter(j => j.is_remote);
+  if (f === 'fulltime') jobs = allJobs.filter(j => j.job_type === 'fulltime');
+  if (f === 'salary')   jobs = allJobs.filter(j => j.salary);
+  document.getElementById('toolbarCount').textContent = `${jobs.length} results`;
+  renderJobs(jobs);
+}
+
+function sortResults() {
+  const s = document.getElementById('sortSelect').value;
+  const jobs = [...allJobs];
+  if (s === 'company') jobs.sort((a,b) => (a.company||'').localeCompare(b.company||''));
+  if (s === 'title')   jobs.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+  if (s === 'date')    jobs.sort((a,b) => new Date(b.date_posted||0) - new Date(a.date_posted||0));
+  if (s === 'salary')  jobs.sort((a,b) => (b.salary?1:0) - (a.salary?1:0));
+  renderJobs(jobs);
+}
+
+// ── CSV export ─────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!allJobs.length) return;
+  const cols = ['title','company','location','is_remote','job_type','salary','site','date_posted','careers_url','job_url'];
+  const rows = allJobs.map(j => cols.map(c => `"${String(j[c]||'').replace(/"/g,'""')}"`).join(','));
+  const blob = new Blob([cols.join(',')+'\n'+rows.join('\n')], {type:'text/csv'});
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: `plinko-job-scout-${new Date().toISOString().slice(0,10)}.csv`,
+  });
+  a.click();
+  toast('Exported to CSV', 'ok');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function setProgress(msg, pct) {
+  document.getElementById('progressMsg').textContent  = msg;
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+function hideProgress() {
+  setTimeout(() => document.getElementById('progressWrap').classList.remove('visible'), 600);
+}
+function resetBtn() {
+  const b = document.getElementById('searchBtn');
+  b.disabled = false;
+  b.textContent = 'Find Jobs';
+}
+</script>
+</body>
+</html>
