@@ -49,8 +49,8 @@ chmod +x install.sh build.sh
 
 **macOS / Linux:**
 ```bash
-git clone https://github.com/Jmx097/scout
-cd scout/job-scout
+git clone https://github.com/Jmx097/Job-Scout-public
+cd Job-Scout-public/job-scout
 chmod +x install.sh start.sh
 ./install.sh
 ./start.sh
@@ -59,7 +59,7 @@ chmod +x install.sh start.sh
 **Windows:**
 ```
 git clone https://github.com/Jmx097/scout
-cd scout\job-scout
+cd Job-Scout-public\job-scout
 install.bat
 start.bat
 ```

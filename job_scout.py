@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """
-job_scout.py — JobSpy-based job sourcing script.
+job_scout.py — CLI job search tool powered by JobSpy.
 
-Targets: US-based, 100% remote, $120k+, non-senior, AI-related roles in
-customer success / solutions engineering / presales / AI product.
+Searches LinkedIn, Indeed, and ZipRecruiter simultaneously, filters and scores
+results, then outputs a CSV and a Markdown shortlist with direct company
+career-page links (not ephemeral job-board URLs).
 
-Outputs:
-  jobs_raw.csv        — everything scraped (for debugging/tuning)
-  jobs_filtered.csv   — matches after all filters, scored by signal
-  shortlist.md        — top matches with company CAREER PAGE links (not job-board links)
+Outputs
+-------
+  jobs_raw.csv        — everything scraped (useful for debugging / tuning)
+  jobs_filtered.csv   — matches after all filters, ranked by signal score
+  shortlist.md        — top 25 with company careers-page links
 
-Usage:
-  pip install -U python-jobspy
+Usage
+-----
+  pip install -U python-jobspy pandas
   python job_scout.py
+
+Repo: https://github.com/Jmx097/Job-Scout-public
 """
 
 import csv
@@ -24,8 +29,15 @@ from urllib.parse import urlparse, quote_plus
 import pandas as pd
 from jobspy import scrape_jobs
 
-# ----------------------------- CONFIG ---------------------------------------
+# =============================================================================
+# ██████  CONFIG — edit this section to match your search
+# =============================================================================
 
+# One or more search terms. Use quoted phrases and -exclusions to narrow.
+# Examples:
+#   '"solutions engineer" AI remote'
+#   '"product manager" fintech -senior'
+#   '"data analyst" healthcare remote'
 SEARCH_TERMS = [
     '"solutions engineer" AI remote -senior -staff -principal',
     '"sales engineer" AI remote -senior -staff -principal',
@@ -36,20 +48,32 @@ SEARCH_TERMS = [
     '"forward deployed engineer" remote -senior',
 ]
 
+# Job boards to search. Options: "indeed", "linkedin", "zip_recruiter", "glassdoor"
 SITES = ["indeed", "zip_recruiter", "linkedin"]
+
+# Results to fetch per search term per site (higher = slower + more rate-limiting)
 RESULTS_PER_TERM_PER_SITE = 25
-HOURS_OLD = 96          # recently posted only (LinkedIn/Indeed honor this)
+
+# Only include jobs posted within this many hours (LinkedIn/Indeed honor this best)
+HOURS_OLD = 96
+
+# Minimum annual salary. Jobs with no salary listed are kept but scored lower.
+# Set to 0 to disable the salary filter entirely.
 MIN_SALARY = 120_000
+
+# Country for Indeed searches ("USA", "Canada", "UK", "Australia", etc.)
 COUNTRY = "USA"
 
-# Title must NOT contain (seniority / wrong-level filter)
+# Title exclusion filter — jobs whose titles match this regex are dropped.
+# Adjust or replace the pattern to match your target seniority level.
 EXCLUDE_TITLE = re.compile(
     r"\b(senior|sr\.?|staff|principal|lead|director|vp|vice president|head of|"
     r"chief|intern|internship|manager,? (?:engineering|software)|junior|jr\.?)\b",
     re.I,
 )
 
-# Title must contain at least one (role-relevance filter)
+# Title inclusion filter — only jobs whose titles match this are kept.
+# Replace with your target roles.
 INCLUDE_TITLE = re.compile(
     r"(solutions? (engineer|architect|consultant)|sales engineer|"
     r"pre-?sales|customer success|technical account manager|"
@@ -58,12 +82,22 @@ INCLUDE_TITLE = re.compile(
     re.I,
 )
 
-# AI-relatedness keywords (title/description/company) — used for scoring
+# Keywords that indicate AI-relevance (used for scoring, not filtering).
+# Matches in the title score higher than matches in the description.
 AI_KEYWORDS = re.compile(
     r"\b(AI|artificial intelligence|machine learning|ML|LLM|GenAI|"
     r"generative|NLP|deep learning|copilot|agentic|foundation model)\b",
     re.I,
 )
+
+# Proxies to use (recommended for LinkedIn to avoid rate limits).
+# Format: ["user:pass@host:port", ...]  — leave empty to skip.
+PROXIES = []
+
+# =============================================================================
+# END CONFIG
+# =============================================================================
+
 
 US_STATES = {
     "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
@@ -72,7 +106,8 @@ US_STATES = {
     "VA","WA","WV","WI","WY","DC",
 }
 
-# ----------------------------- SCRAPE ---------------------------------------
+
+# ── Scraping ──────────────────────────────────────────────────────────────────
 
 def scrape_all() -> pd.DataFrame:
     frames = []
@@ -88,8 +123,10 @@ def scrape_all() -> pd.DataFrame:
                 enforce_annual_salary=True,
                 verbose=0,
             )
-            # Indeed/LinkedIn: hours_old can't combine with is_remote ->
-            # use hours_old and filter remote post-hoc (term contains "remote").
+            if PROXIES:
+                kwargs["proxies"] = PROXIES
+            # Indeed/LinkedIn: hours_old can't combine with is_remote —
+            # use hours_old and filter remote post-hoc via search term or flag.
             if site in ("indeed", "linkedin"):
                 kwargs["hours_old"] = HOURS_OLD
                 if site == "linkedin":
@@ -110,7 +147,8 @@ def scrape_all() -> pd.DataFrame:
     out = pd.concat(frames, ignore_index=True)
     return out.drop_duplicates(subset=["title", "company"], keep="first")
 
-# ----------------------------- FILTERS --------------------------------------
+
+# ── Filters ───────────────────────────────────────────────────────────────────
 
 def is_us(row) -> bool:
     loc = str(row.get("location") or "")
@@ -123,12 +161,14 @@ def is_us(row) -> bool:
 def remote_ok(row) -> bool:
     if row.get("is_remote") is True:
         return True
-    text = f"{row.get('title','')} {row.get('location','')}"
+    text = f"{row.get('title', '')} {row.get('location', '')}"
     return bool(re.search(r"\bremote\b", str(text), re.I))
 
 
 def salary_ok(row) -> bool:
-    """Keep if max comp >= MIN_SALARY, or salary unlisted but desc mentions 120k+."""
+    """Keep if max comp >= MIN_SALARY, or if no salary is listed (unlisted = keep)."""
+    if MIN_SALARY == 0:
+        return True
     mx = row.get("max_amount")
     mn = row.get("min_amount")
     interval = str(row.get("interval") or "")
@@ -141,10 +181,9 @@ def salary_ok(row) -> bool:
                 return True
         except (TypeError, ValueError):
             pass
+    # No salary listed — keep but it scores lower
     if pd.isna(mx) and pd.isna(mn):
-        desc = str(row.get("description") or "")
-        m = re.findall(r"\$\s?(\d{3})[,.]?\d{3}", desc)
-        return any(int(x) >= 120 for x in m)
+        return True
     return False
 
 
@@ -158,7 +197,8 @@ def level_ok(row) -> bool:
 def role_ok(row) -> bool:
     return bool(INCLUDE_TITLE.search(str(row.get("title") or "")))
 
-# ----------------------------- SCORING --------------------------------------
+
+# ── Career-page derivation ────────────────────────────────────────────────────
 
 ATS_PATTERNS = [
     (r"boards\.greenhouse\.io/([^/]+)", "https://boards.greenhouse.io/{}"),
@@ -175,8 +215,7 @@ ATS_PATTERNS = [
 
 
 def career_page(row) -> str:
-    """Derive a company career-page URL from the direct apply URL or fall back
-    to a Google 'company careers' search link."""
+    """Return the company's ATS/careers page URL, or a Google fallback."""
     direct = str(row.get("job_url_direct") or "")
     for pat, tmpl in ATS_PATTERNS:
         m = re.search(pat, direct)
@@ -184,68 +223,70 @@ def career_page(row) -> str:
             return tmpl.format(*m.groups())
     if direct.startswith("http"):
         host = urlparse(direct).netloc
-        # career subdomain on company site, e.g. careers.company.com
         if not any(b in host for b in ("indeed", "linkedin", "ziprecruiter", "glassdoor")):
             return f"https://{host}"
     company = str(row.get("company") or "")
     return f"https://www.google.com/search?q={quote_plus(company + ' careers')}"
 
 
+# ── Scoring ───────────────────────────────────────────────────────────────────
+
 def ai_score(row) -> int:
+    """Count AI-keyword hits (title weighted higher than description)."""
     s = 0
-    title = str(row.get("title") or "")
-    company = str(row.get("company") or "")
-    desc = str(row.get("description") or "")
-    if AI_KEYWORDS.search(title):
+    if AI_KEYWORDS.search(str(row.get("title") or "")):
         s += 3
-    if AI_KEYWORDS.search(company):
+    if AI_KEYWORDS.search(str(row.get("company") or "")):
         s += 2
-    s += min(len(AI_KEYWORDS.findall(desc)), 5)
+    s += min(len(AI_KEYWORDS.findall(str(row.get("description") or ""))), 5)
     return s
 
 
 def signal_score(row) -> float:
-    """Higher = stronger signal & easier apply."""
+    """Higher = stronger signal & easier to apply."""
     s = float(ai_score(row))
     if pd.notna(row.get("max_amount")) or pd.notna(row.get("min_amount")):
-        s += 2                      # transparent comp = serious posting
+        s += 2                          # transparent comp = serious posting
     if not career_page(row).startswith("https://www.google.com"):
-        s += 3                      # real ATS/career page found = easy apply
-    dp = row.get("date_posted")
+        s += 3                          # real ATS page found = easy apply
     try:
-        days = (datetime.now().date() - pd.to_datetime(dp).date()).days
-        s += max(0, 3 - days)       # fresher = better
+        days = (datetime.now().date() - pd.to_datetime(row.get("date_posted")).date()).days
+        s += max(0, 3 - days)           # fresher is better
     except Exception:
         pass
     if row.get("is_remote") is True:
         s += 1
     return s
 
-# ----------------------------- MAIN -----------------------------------------
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    print("Scraping...")
+    print("Scraping jobs...")
     raw = scrape_all()
     print(f"\nTotal scraped (deduped): {len(raw)}")
     if raw.empty:
         sys.exit("No jobs scraped — likely rate-limited. Wait and retry, or add proxies.")
 
     raw.to_csv("jobs_raw.csv", quoting=csv.QUOTE_NONNUMERIC, escapechar="\\", index=False)
+    print(f"  → jobs_raw.csv saved ({len(raw)} rows)")
 
+    # Apply filters
     df = raw[raw.apply(is_us, axis=1)]
     df = df[df.apply(remote_ok, axis=1)]
     df = df[df.apply(level_ok, axis=1)]
     df = df[df.apply(role_ok, axis=1)]
     df = df[df.apply(salary_ok, axis=1)]
-    print(f"After US/remote/level/role/salary filters: {len(df)}")
+    print(f"After filters (US · remote · level · role · salary): {len(df)}")
 
     if df.empty:
-        sys.exit("No jobs passed the filters. Loosen HOURS_OLD or MIN_SALARY.")
+        sys.exit("No jobs passed the filters — try relaxing HOURS_OLD, MIN_SALARY, or INCLUDE_TITLE.")
 
+    # Score and sort
     df = df.copy()
-    df["career_page"] = df.apply(career_page, axis=1)
-    df["ai_score"] = df.apply(ai_score, axis=1)
-    df["signal_score"] = df.apply(signal_score, axis=1)
+    df["career_page"]   = df.apply(career_page, axis=1)
+    df["ai_score"]      = df.apply(ai_score, axis=1)
+    df["signal_score"]  = df.apply(signal_score, axis=1)
     df = df.sort_values("signal_score", ascending=False)
 
     keep = ["title", "company", "career_page", "signal_score", "ai_score",
@@ -253,13 +294,13 @@ def main():
             "job_url", "job_url_direct"]
     df[[c for c in keep if c in df.columns]].to_csv(
         "jobs_filtered.csv", quoting=csv.QUOTE_NONNUMERIC, escapechar="\\", index=False)
+    print(f"  → jobs_filtered.csv saved ({len(df)} rows)")
 
     # Markdown shortlist
     lines = [
         f"# Job Shortlist — {datetime.now():%Y-%m-%d}",
         "",
-        "US-based · 100% remote · $120k+ · non-senior · AI-weighted. "
-        "Links go to **company career pages**, sorted by signal score.",
+        "Filtered · ranked by signal score · links go to **company career pages**.",
         "",
     ]
     for _, r in df.head(25).iterrows():
@@ -276,8 +317,7 @@ def main():
         )
     with open("shortlist.md", "w") as f:
         f.write("\n".join(lines) + "\n")
-
-    print(f"\nWrote jobs_raw.csv ({len(raw)}), jobs_filtered.csv ({len(df)}), shortlist.md")
+    print(f"  → shortlist.md saved (top {min(25, len(df))} results)")
 
 
 if __name__ == "__main__":
