@@ -1,4 +1,12 @@
+.venv/
+build/
+dist/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.spec
 jobscout-preview.log
 jobscout-preview.err.log
+uploads/*
+!uploads/.gitkeep
