@@ -1,83 +1,84 @@
-# 🔍 Job Scout
+# Job Scout
 
-A local, open-source job aggregator with a polished UI. Upload your CV, set your criteria, and scout hot opportunities across LinkedIn, Indeed, Glassdoor, ZipRecruiter, and Google Jobs — all in one place.
+A local, open-source job aggregator with a polished UI. Upload your CV, set your criteria, and scout opportunities across LinkedIn, Indeed, Glassdoor, ZipRecruiter, and Google Jobs in one place.
 
 Built with the [BMAD methodology](https://github.com/bmad-code-org/BMAD-METHOD) and powered by [JobSpy](https://github.com/speedyapply/JobSpy).
 
----
-
 ## Features
 
-- **CV upload** — drag-and-drop PDF or DOCX; auto-extracts skills and roles to pre-fill your search
-- **Multi-source search** — LinkedIn · Indeed · Glassdoor · ZipRecruiter · Google Jobs (concurrent)
-- **Company careers links** — links go to the company's `/careers` page, not ephemeral listing URLs
-- **Live progress stream** — real-time updates as each source responds
-- **Filter & sort** — remote, full-time, has-salary, newest first
-- **CSV export** — one click to export all results
-- **Proxy support** — configure proxies in the Settings tab to avoid rate limits
-- **100% local** — no accounts, no API keys, no data sent anywhere
+- CV upload with PDF, DOCX, DOC, and TXT support
+- Resume keyword extraction to pre-fill likely target roles
+- Multi-source search across major job boards
+- Fit scoring with stronger weighting for true title alignment
+- Filters for remote, full-time, salary visibility, and freshness
+- CSV export for application tracking
+- Proxy support for sources that rate-limit aggressively
+- 100% local runtime with no account or API key required
 
----
+## Privacy
+
+- The app runs locally on `127.0.0.1` by default.
+- Uploaded CVs are parsed and then immediately deleted from disk.
+- No resume data is intentionally sent to any third-party API by this app itself.
+- Job searches do reach the selected job sources through JobSpy, so users should review the source terms and their own proxy setup before heavy use.
 
 ## Requirements
 
-- Python 3.10 or later ([download](https://www.python.org/downloads/))
-
----
+- Python 3.10 or later
 
 ## Quick Start
 
-### Option A — One-click executable (recommended)
+### Option A: Build a desktop executable
 
-Build once, share anywhere. No Python required on the target machine.
+Windows:
 
-**Windows:**
+```powershell
+install.bat
+build.bat
 ```
-install.bat     ← sets up the build environment (once)
-build.bat       ← compiles to dist\JobScout.exe (once)
-```
-Then double-click `dist\JobScout.exe` — browser opens automatically.
 
-**macOS / Linux:**
+This produces `dist\JobScout.exe`.
+
+macOS / Linux:
+
 ```bash
 chmod +x install.sh build.sh
 ./install.sh
-./build.sh      # produces dist/JobScout (+ dist/JobScout.app on Mac)
+./build.sh
 ```
 
-### Option B — Run from source
+This produces `dist/JobScout` and, on macOS, `dist/JobScout.app`.
 
-**macOS / Linux:**
+### Option B: Run from source
+
+macOS / Linux:
+
 ```bash
-git clone https://github.com/Jmx097/Job-Scout-public
+git clone https://github.com/Jmx097/Job-Scout-public.git
 cd Job-Scout-public/job-scout
 chmod +x install.sh start.sh
 ./install.sh
 ./start.sh
 ```
 
-**Windows:**
-```
-git clone https://github.com/Jmx097/scout
+Windows:
+
+```powershell
+git clone https://github.com/Jmx097/Job-Scout-public.git
 cd Job-Scout-public\job-scout
 install.bat
 start.bat
 ```
 
-Then open **http://localhost:5000** in your browser (it opens automatically).
-
----
+Then open [http://localhost:5000](http://localhost:5000).
 
 ## Usage
 
-1. **CV tab** — upload your PDF or DOCX CV. Skills and roles are extracted automatically and used to pre-fill the search.
-2. **CV tab / Criteria tab** — set your job title, location, remote preference, and job type.
-3. Hit **Scout Jobs** — results stream in as each board responds.
-4. **Filter** results by Remote / Full Time / Has Salary.
-5. Click **Company Careers** on any card to go directly to that company's careers page.
-6. Export to CSV if you want to track applications in a spreadsheet.
-
----
+1. Upload a CV in the CV tab.
+2. Review the suggested role and adjust search criteria.
+3. Choose location, remote preference, job type, freshness, and sources.
+4. Run the search and review results sorted by best fit.
+5. Export matching jobs to CSV if needed.
 
 ## Configuration
 
@@ -86,59 +87,50 @@ Then open **http://localhost:5000** in your browser (it opens automatically).
 | Port | `PORT` env variable | `5000` |
 | Results per source | Criteria panel | `15` |
 | Posted within | Criteria panel | `72 hours` |
+| Minimum fit | Criteria panel | `50` |
 | Proxies | Settings panel | None |
 
-### Proxies (recommended for LinkedIn)
+Example proxy format:
 
-LinkedIn rate-limits aggressively. Add proxies in the **Settings** tab (one per line):
-
-```
+```text
 user:pass@host:port
 ```
 
----
-
 ## Architecture
 
-```
+```text
 job-scout/
-├── app.py           # Flask backend — CV parsing, JobSpy wrapper, SSE streaming
-├── requirements.txt
-├── install.sh / install.bat
-├── start.sh / start.bat
-├── static/
-│   └── index.html   # Single-file SPA — all CSS + JS inline
-└── uploads/         # Temporary CV storage (local only)
+|-- app.py
+|-- requirements.txt
+|-- install.sh / install.bat
+|-- start.sh / start.bat
+|-- static/
+|   `-- index.html
+`-- uploads/
 ```
 
-The backend exposes three endpoints:
+API endpoints:
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `POST /api/upload-cv` | POST | Parse CV, return keywords |
-| `POST /api/search` | POST | Start a JobSpy search, return session ID |
-| `GET /api/search/:id/stream` | GET (SSE) | Stream progress events |
-| `GET /api/search/:id/results` | GET | Fetch final results |
+| `/api/health` | GET | Health check |
+| `/api/upload-cv` | POST | Parse CV and return extracted keywords |
+| `/api/search` | POST | Start a search session |
+| `/api/search/<id>/stream` | GET | Stream progress events |
+| `/api/search/<id>/results` | GET | Fetch final results |
 
----
+## Notes on Sources
 
-## Notes on Job Sources
+- Indeed usually gives the broadest coverage.
+- LinkedIn often benefits from proxies because of rate limiting.
+- ZipRecruiter is strongest in the US and Canada.
+- Google Jobs can benefit from a custom `google_search_term`.
+- Glassdoor is optional and may add useful coverage.
 
-| Source | Notes |
-|---|---|
-| **Indeed** | Best results, no rate limiting, searches description text |
-| **LinkedIn** | Richest data; rate-limits ~page 10 without proxies |
-| **ZipRecruiter** | US/Canada only |
-| **Google Jobs** | Requires specific `google_search_term` syntax |
-| **Glassdoor** | Good coverage, opt-in |
+## Distribution
 
----
+This repository is intended to be cloned, modified, and self-hosted locally by other users. If you distribute binaries, keep the app bound to localhost unless you also add authentication, rate limits, and stronger file-handling controls.
 
-## Open Source
+## License
 
-MIT License. Contributions welcome — PRs, issues, and forks encouraged.
-
-Built on top of:
-- [speedyapply/JobSpy](https://github.com/speedyapply/JobSpy) — the scraping engine
-- [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD) — agent-driven development methodology
-- [Flask](https://flask.palletsprojects.com/) — backend framework
+MIT. See [LICENSE](LICENSE).

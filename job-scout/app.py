@@ -426,14 +426,17 @@ def upload_cv():
     ext = Path(f.filename).suffix.lower()
     if ext not in {".pdf", ".docx", ".doc", ".txt"}:
         return jsonify({"error": "Unsupported file type. Use PDF, DOCX, or TXT."}), 400
-    save_path = UPLOAD_FOLDER / f"cv{ext}"
+    save_path = UPLOAD_FOLDER / f"{uuid.uuid4()}{ext}"
     f.save(str(save_path))
-    if ext == ".pdf":
-        text = parse_cv_pdf(str(save_path))
-    elif ext in {".docx", ".doc"}:
-        text = parse_cv_docx(str(save_path))
-    else:
-        text = save_path.read_text(errors="ignore")
+    try:
+        if ext == ".pdf":
+            text = parse_cv_pdf(str(save_path))
+        elif ext in {".docx", ".doc"}:
+            text = parse_cv_docx(str(save_path))
+        else:
+            text = save_path.read_text(errors="ignore")
+    finally:
+        save_path.unlink(missing_ok=True)
     keywords = extract_cv_keywords(text)
     return jsonify(
         {
