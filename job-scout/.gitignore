@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+jobscout-preview.log
+jobscout-preview.err.log

@@ -375,6 +375,9 @@ textarea.input { resize: vertical; }
 }
 .meta-tag.remote { border-color: #a7d7bb; color: var(--green-dark); background: var(--green-light); }
 .meta-tag.source { border-color: #bfdbfe; color: #1d4ed8; background: #eff6ff; }
+.meta-tag.fit-high { border-color: #86efac; color: #166534; background: #f0fdf4; }
+.meta-tag.fit-medium { border-color: #fde68a; color: #92400e; background: #fffbeb; }
+.meta-tag.fit-low { border-color: #fecaca; color: #991b1b; background: #fef2f2; }
 
 .card-salary { font-size: 12px; font-weight: 600; color: var(--green-dark); }
 
@@ -586,6 +589,17 @@ textarea.input { resize: vertical; }
       </div>
 
       <div class="field">
+        <label class="label" for="minFitScore">Minimum fit</label>
+        <select class="input" id="minFitScore">
+          <option value="0">Show everything</option>
+          <option value="35">Balanced</option>
+          <option value="50" selected>Stronger fit only</option>
+          <option value="65">High fit only</option>
+        </select>
+        <span class="hint">Now prioritizes strong title alignment and suppresses adjacent or off-target role families.</span>
+      </div>
+
+      <div class="field">
         <label class="label" for="googleTerm">Google-specific query</label>
         <input class="input" id="googleTerm" type="text" placeholder="Leave blank to auto-generate" />
         <span class="hint">Google Jobs uses its own search syntax. Leave blank to use your title + location.</span>
@@ -675,10 +689,11 @@ textarea.input { resize: vertical; }
       <button class="pill" onclick="filterBy('fulltime',this)">Full-time</button>
       <button class="pill" onclick="filterBy('salary',this)">Has salary</button>
       <select class="sort-select" id="sortSelect" onchange="sortResults()">
+        <option value="fit" selected>Best fit</option>
         <option value="date">Newest first</option>
         <option value="company">Company A-Z</option>
         <option value="title">Title A-Z</option>
-        <option value="salary">Salary</option>
+        <option value="salary">Has salary</option>
       </select>
       <span class="toolbar-count" id="toolbarCount"></span>
     </div>
@@ -807,14 +822,16 @@ async function startSearch() {
     || `${term} jobs ${document.getElementById('location').value.trim()}`;
 
   const params = {
-    search_term:       term,
-    location:          document.getElementById('location').value.trim(),
-    is_remote:         document.getElementById('isRemote').checked,
-    job_type:          document.getElementById('jobType').value || null,
-    hours_old:         parseInt(document.getElementById('hoursOld').value),
-    results_per_site:  parseInt(document.getElementById('resultsPerSite').value),
-    country_indeed:    document.getElementById('countryIndeed').value,
+    search_term:        term,
+    location:           document.getElementById('location').value.trim(),
+    is_remote:          document.getElementById('isRemote').checked,
+    job_type:           document.getElementById('jobType').value || null,
+    hours_old:          parseInt(document.getElementById('hoursOld').value),
+    results_per_site:   parseInt(document.getElementById('resultsPerSite').value),
+    country_indeed:     document.getElementById('countryIndeed').value,
     google_search_term: googleTerm,
+    exclude_keywords:   getExcludeWords(),
+    min_fit_score:      parseInt(document.getElementById('minFitScore').value),
     sites,
   };
 
@@ -861,18 +878,18 @@ async function fetchResults(sid, params) {
     const res  = await fetch(`/api/search/${sid}/results`);
     const data = await res.json();
 
-    // Apply seniority + exclusion filtering client-side
     const excludeWords = getExcludeWords();
     allJobs = (data.results || []).filter(job => {
       if (!excludeWords.length) return true;
       const title = (job.title || '').toLowerCase();
       return !excludeWords.some(w => title.includes(w));
     });
+    allJobs.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
 
     renderJobs(allJobs);
     document.getElementById('topTitle').textContent = `${allJobs.length} opportunities`;
     document.getElementById('topMeta').textContent  =
-      `"${params.search_term}" · ${params.location || 'Anywhere'} · ${params.sites.join(', ')}`;
+      `"${params.search_term}" · ${params.location || 'Anywhere'} · ${params.sites.join(', ')} · best fit first`;
     document.getElementById('toolbar').classList.add('visible');
     document.getElementById('exportBtn').style.display = '';
     document.getElementById('toolbarCount').textContent = `${allJobs.length} results`;
@@ -909,6 +926,8 @@ function renderJobs(jobs) {
       : init;
 
     const remote  = j.is_remote  ? `<span class="meta-tag remote">Remote</span>` : '';
+    const fitClass = (j.fit_score || 0) >= 70 ? 'fit-high' : ((j.fit_score || 0) >= 45 ? 'fit-medium' : 'fit-low');
+    const fitTag = j.fit_score != null ? `<span class="meta-tag ${fitClass}">${x(j.fit_label || 'Fit')} fit ${x(j.fit_score)}</span>` : '';
     const jtype   = j.job_type   ? `<span class="meta-tag">${x(j.job_type)}</span>` : '';
     const loc     = j.location   ? `<span class="meta-tag">${x(j.location)}</span>` : '';
     const posted  = j.date_posted? `<span class="meta-tag">${x(j.date_posted)}</span>` : '';
@@ -926,7 +945,7 @@ function renderJobs(jobs) {
           <div class="card-company">${x(j.company)}${j.industry ? ' &middot; ' + x(j.industry) : ''}</div>
         </div>
       </div>
-      <div class="card-meta">${remote}${jtype}${loc}${posted}${source}</div>
+      <div class="card-meta">${fitTag}${remote}${jtype}${loc}${posted}${source}</div>
       ${salary}
       ${desc}
       <div class="card-actions">
@@ -958,6 +977,7 @@ function filterBy(f, btn) {
 function sortResults() {
   const s = document.getElementById('sortSelect').value;
   const jobs = [...allJobs];
+  if (s === 'fit')     jobs.sort((a,b) => (b.fit_score||0) - (a.fit_score||0));
   if (s === 'company') jobs.sort((a,b) => (a.company||'').localeCompare(b.company||''));
   if (s === 'title')   jobs.sort((a,b) => (a.title||'').localeCompare(b.title||''));
   if (s === 'date')    jobs.sort((a,b) => new Date(b.date_posted||0) - new Date(a.date_posted||0));
